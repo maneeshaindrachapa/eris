@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+set -eu
+
+if ! command -v go >/dev/null 2>&1; then
+  echo "pre-commit: go command not found" >&2
+  exit 1
+fi
+
+staged_go_files=$(git diff --cached --name-only --diff-filter=ACMR -- '*.go')
+
+if [ -n "$staged_go_files" ]; then
+  unformatted=$(printf '%s\n' "$staged_go_files" | xargs gofmt -l)
+  if [ -n "$unformatted" ]; then
+    echo "pre-commit: gofmt required for:" >&2
+    printf '%s\n' "$unformatted" >&2
+    echo "Run: gofmt -w $unformatted" >&2
+    exit 1
+  fi
+fi
+
+echo "pre-commit: running go test ./..."
+go test ./...

@@ -88,17 +88,17 @@ func main() {
 	if err != nil {
 		log.Fatalf("create-client: hash secret: %v", err)
 	}
-	cfg, err := config.Load(".env")
+	cfg, err := config.Load(config.Path())
 	if err != nil {
 		log.Fatalf("create-client: config: %v", err)
 	}
-	if cfg.PostgresDSN == "" {
-		log.Fatal("create-client: POSTGRES_DSN is required")
+	if cfg.Postgres.DSN == "" {
+		log.Fatal("create-client: postgres.dsn is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	pool, err := pgxpool.New(ctx, cfg.PostgresDSN)
+	pool, err := pgxpool.New(ctx, cfg.Postgres.DSN)
 	if err != nil {
 		log.Fatalf("create-client: postgres pool: %v", err)
 	}

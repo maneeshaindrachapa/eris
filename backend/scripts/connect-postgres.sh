@@ -2,28 +2,24 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repo_root=$(dirname "$script_dir")
-env_file="$repo_root/.env"
+backend_root=$(dirname "$script_dir")
+read_config() { (cd "$backend_root" && go run ./cmd/config "$@"); }
+option=${1:-}
+psql_args="$*"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "connect-postgres: docker is not installed or not in PATH" >&2
   exit 1
 fi
 
-if [ -f "$env_file" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$env_file"
-  set +a
-fi
-
-postgres_container=${POSTGRES_CONTAINER:-eris-postgres}
-postgres_image=${POSTGRES_IMAGE:-postgres:17}
-postgres_user=${POSTGRES_USER:-eris}
-postgres_password=${POSTGRES_PASSWORD:-eris}
-postgres_db=${POSTGRES_DB:-eris}
-postgres_port=${POSTGRES_PORT:-5432}
-postgres_volume=${POSTGRES_VOLUME:-eris-postgres-data}
+set -- $(read_config postgres.container postgres.image postgres.user postgres.password postgres.database postgres.port postgres.volume)
+postgres_container=$1
+postgres_image=$2
+postgres_user=$3
+postgres_password=$4
+postgres_db=$5
+postgres_port=$6
+postgres_volume=$7
 
 if ! docker info >/dev/null 2>&1; then
   echo "connect-postgres: docker is not running" >&2
@@ -58,16 +54,18 @@ until docker exec "$postgres_container" pg_isready -U "$postgres_user" -d "$post
   sleep 1
 done
 
-if [ "${1:-}" = "--init" ]; then
+if [ "$option" = "--init" ]; then
   exec "$script_dir/migrate.sh" up
 fi
 
-if [ "${1:-}" = "--wait" ]; then
+if [ "$option" = "--wait" ]; then
   exit 0
 fi
 
 if [ -t 0 ] && [ -t 1 ]; then
+  set -- $psql_args
   exec docker exec -it "$postgres_container" psql -U "$postgres_user" -d "$postgres_db" "$@"
 fi
 
+set -- $psql_args
 exec docker exec -i "$postgres_container" psql -U "$postgres_user" -d "$postgres_db" "$@"

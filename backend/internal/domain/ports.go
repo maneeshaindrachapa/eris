@@ -16,6 +16,9 @@ type UserRepository interface {
 
 type ClientRepository interface {
 	FindByID(ctx context.Context, id string) (Client, error)
+	List(ctx context.Context) ([]Client, error)
+	Create(ctx context.Context, client Client) error
+	Update(ctx context.Context, client Client) error
 }
 
 // AuthCodeStore's Consume method is deliberately one atomic operation, not
@@ -88,6 +91,25 @@ type TokenResult struct {
 	IDToken      string // empty unless "openid" scope was requested
 	ExpiresIn    int
 	Scopes       []string
+}
+
+type AdminClientInput struct {
+	Name              string
+	Type              ClientType
+	RedirectURIs      []string
+	AllowedScopes     []string
+	AllowedGrantTypes []GrantType
+}
+
+type AdminClientResult struct {
+	Client       Client
+	ClientSecret string
+}
+
+type AdminService interface {
+	ListClients(ctx context.Context) ([]Client, error)
+	CreateClient(ctx context.Context, input AdminClientInput) (AdminClientResult, error)
+	UpdateClient(ctx context.Context, id string, input AdminClientInput) (Client, error)
 }
 
 type KeyStore interface {

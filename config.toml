@@ -1,0 +1,25 @@
+environment = "development"
+
+[backend]
+storage_backend = "postgres"
+server_address = ":8080"
+issuer_url = "http://localhost:8080"
+
+[frontend]
+origin = "http://localhost:3000"
+public_url = "http://localhost:3000"
+default_callback_path = "/callback"
+
+[postgres]
+dsn = "postgres://eris:eris@localhost:5432/eris?sslmode=disable"
+container = "eris-postgres"
+image = "postgres:16"
+user = "eris"
+password = "eris"
+database = "eris"
+hostname = "localhost"
+port = 5432
+volume = "eris-postgres-data"
+
+[tools]
+migrate_image = "migrate/migrate:v4.18.3"

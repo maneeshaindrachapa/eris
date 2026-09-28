@@ -2,29 +2,24 @@
 set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repo_root=$(dirname "$script_dir")
-env_file="$repo_root/.env"
+backend_root=$(dirname "$script_dir")
+read_config() { (cd "$backend_root" && go run ./cmd/config "$@"); }
+command=${1:-up}
+command_arg=${2:-}
 
-if [ -f "$env_file" ]; then
-  set -a
-  # shellcheck disable=SC1090
-  . "$env_file"
-  set +a
-fi
-
-postgres_container=${POSTGRES_CONTAINER:-eris-postgres}
-postgres_user=${POSTGRES_USER:-eris}
-postgres_password=${POSTGRES_PASSWORD:-eris}
-postgres_db=${POSTGRES_DB:-eris}
-postgres_hostname=${POSTGRES_HOSTNAME:-localhost}
-postgres_port=${POSTGRES_PORT:-5432}
-migrate_image=${MIGRATE_IMAGE:-migrate/migrate:v4.18.3}
+set -- $(read_config postgres.container postgres.user postgres.password postgres.database postgres.hostname postgres.port tools.migrate_image)
+postgres_container=$1
+postgres_user=$2
+postgres_password=$3
+postgres_db=$4
+postgres_hostname=$5
+postgres_port=$6
+migrate_image=$7
 
 migration_dsn="postgres://${postgres_user}:${postgres_password}@${postgres_hostname}:${postgres_port}/${postgres_db}?sslmode=disable"
-command=${1:-up}
 
 if [ "$command" = "create" ]; then
-  name=${2:-}
+  name=$command_arg
   if [ -z "$name" ]; then
     echo "Usage: $0 create <migration_name>" >&2
     exit 1
@@ -37,8 +32,8 @@ if [ "$command" = "create" ]; then
   esac
 
   version=$(date -u +%Y%m%d%H%M%S)
-  touch "$repo_root/migrations/${version}_${name}.up.sql"
-  touch "$repo_root/migrations/${version}_${name}.down.sql"
+  touch "$backend_root/migrations/${version}_${name}.up.sql"
+  touch "$backend_root/migrations/${version}_${name}.down.sql"
   echo "Created migrations/${version}_${name}.{up,down}.sql"
   exit 0
 fi
@@ -50,30 +45,29 @@ fi
 
 "$script_dir/connect-postgres.sh" --wait
 
-shift || true
 case "$command" in
   up)
-    set -- up "$@"
+    if [ -n "$command_arg" ]; then set -- up "$command_arg"; else set -- up; fi
     ;;
   down)
-    set -- down "${1:-1}"
+    set -- down "${command_arg:-1}"
     ;;
   version)
     set -- version
     ;;
   force)
-    if [ "$#" -ne 1 ]; then
+    if [ -z "$command_arg" ]; then
       echo "Usage: $0 force <version>" >&2
       exit 1
     fi
-    set -- force "$1"
+    set -- force "$command_arg"
     ;;
   goto)
-    if [ "$#" -ne 1 ]; then
+    if [ -z "$command_arg" ]; then
       echo "Usage: $0 goto <version>" >&2
       exit 1
     fi
-    set -- goto "$1"
+    set -- goto "$command_arg"
     ;;
   *)
     echo "Usage: $0 {up [N]|down [N]|version|goto VERSION|force VERSION|create NAME}" >&2
@@ -83,7 +77,7 @@ esac
 
 exec docker run --rm \
   --network "container:$postgres_container" \
-  -v "$repo_root/migrations:/migrations:ro" \
+  -v "$backend_root/migrations:/migrations:ro" \
   "$migrate_image" \
   -path=/migrations \
   -database "$migration_dsn" \

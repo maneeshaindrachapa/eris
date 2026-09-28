@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load(".env")
+	cfg, err := config.Load(config.Path())
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
@@ -37,7 +37,7 @@ func main() {
 	var consents domain.ConsentStore
 	var keystore domain.KeyStore
 
-	switch cfg.StorageBackend {
+	switch cfg.Backend.StorageBackend {
 	case "memory":
 		users = memory.NewUserRepository()
 		clients = memory.NewClientRepository()
@@ -48,7 +48,7 @@ func main() {
 		keystore = eriscrypto.NewMemoryKeyStore()
 		log.Println("using in-memory storage")
 	case "postgres":
-		pool, err := pgxpool.New(ctx, cfg.PostgresDSN)
+		pool, err := pgxpool.New(ctx, cfg.Postgres.DSN)
 		if err != nil {
 			log.Fatalf("postgres pool: %v", err)
 		}
@@ -70,7 +70,7 @@ func main() {
 		log.Println("connected to postgres")
 	}
 
-	issuer, err := eriscrypto.NewJWTIssuer(ctx, keystore, cfg.IssuerURL)
+	issuer, err := eriscrypto.NewJWTIssuer(ctx, keystore, cfg.Backend.IssuerURL)
 	if err != nil {
 		log.Fatalf("token issuer init: %v", err)
 	}
@@ -78,12 +78,13 @@ func main() {
 	// ---- application layer, wired against those interfaces ----
 	authSvc := application.NewAuthorizeService(clients, users, codes, sessions, consents)
 	tokenSvc := application.NewTokenService(clients, codes, refresh, issuer)
+	adminSvc := application.NewAdminService(clients)
 
 	// ---- driving adapter ----
-	e := httpadapter.NewServer(authSvc, tokenSvc)
+	e := httpadapter.NewServer(authSvc, tokenSvc, adminSvc, cfg.Frontend.Origin)
 	go func() {
-		log.Printf("eris listening on %s", cfg.ServerAddress)
-		if err := e.Start(cfg.ServerAddress); err != nil && err != http.ErrServerClosed {
+		log.Printf("eris listening on %s", cfg.Backend.ServerAddress)
+		if err := e.Start(cfg.Backend.ServerAddress); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server error: %v", err)
 		}
 	}()

@@ -101,7 +101,7 @@ TOKEN_RESP=$(curl -s -X POST "$BASE_URL/token" \
   "${TOKEN_CLIENT_ARGS[@]}")
 
 if [ -z "$CLIENT_SECRET" ] && echo "$TOKEN_RESP" | grep -q '"error":"invalid_client"'; then
-  fail "client $CLIENT_ID requires authentication; set CLIENT_SECRET to the one-time secret printed by create-client.sh"
+  fail "client $CLIENT_ID requires authentication; set CLIENT_SECRET to the one-time secret shown when the client was created in the admin portal"
 fi
 
 ACCESS_TOKEN=$(echo "$TOKEN_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('access_token',''))")
